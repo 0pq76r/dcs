@@ -1,16 +1,69 @@
-#include "socket.h"
+#include "tracker.h"
 
 #define BUFFER_SIZE 1024
 
+pthread_mutex_t lock_accept;
+pthread_mutex_t lock_write;
+
+struct sender_data
+{
+	int socket;
+	char data[BUFFER_SIZE];
+};
+
+void *child_tracker_tx(void *send)
+{
+	int sock = ((struct sender_data*)send)->socket;
+	char *buffer=((struct sender_data*)send)->data;
+
+	printf("%s", sock, buffer);
+	
+	free(send);	
+	return NULL;
+}
+
+void *child_tracker_rx(void *_sock)
+{
+    int sock;
+    pthread_t sender;
+	char buffer[BUFFER_SIZE];
+	struct sender_data *send;
+    
+    printf("Waiting for Client\n");
+    
+    while(1){
+		socklen_t slen=sizeof(struct sockaddr);
+		struct sockaddr saddr;
+		
+		pthread_mutex_lock(&lock_accept);
+		sock=accept(*((int*)_sock), &saddr, &slen);
+		pthread_mutex_unlock(&lock_accept);
+
+		printf("Accept Client\n");
+
+		while(read(sock, buffer, BUFFER_SIZE-2)>0){
+			send=malloc(sizeof(struct sender_data));
+			send->socket=sock;
+			strncpy(send->data, buffer, BUFFER_SIZE-1);
+			pthread_create( &sender, NULL, child_tracker_tx, send);
+			bzero(buffer, BUFFER_SIZE);
+		}
+		pthread_join(sender, NULL);
+	}
+
+	close(sock);	
+	return NULL;
+}
+
 void *tracker(void *vport){
-	int sock, n;
+	
+	int sock;
 	int port=*((int*)vport);
-	socklen_t fromlen;
-	char buffer[BUFFER_SIZE]={0};
 	struct sockaddr_in server;
-	struct sockaddr_in client;
+	
+	pthread_t childs[2];
  
-	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		perror("Failed to create socket");
 	}
 
@@ -22,16 +75,16 @@ void *tracker(void *vport){
 	if(bind(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
 		printf("Can not bind in server!\n");
      
-	fromlen = sizeof(struct sockaddr_in);
-	while(1) {
-		unsigned int gen;
-		n = recvfrom(sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &client, &fromlen);
-		if (n < 0) 
-			printf("Error when receiving in server!\n");
-//		nr = ntohl(nr);
-		gen = ntohs(client.sin_port);
-		printf("I have received %s from IP %s and port %u \n",buffer,inet_ntoa(client.sin_addr), gen);
-		bzero(buffer, BUFFER_SIZE);
-	}
+	listen(sock,5);
+	
+	pthread_mutex_init(&lock_accept, NULL);
+	pthread_mutex_init(&lock_write, NULL);
+	pthread_create( &childs[0], NULL, child_tracker_rx, &sock);
+	pthread_create( &childs[1], NULL, child_tracker_rx, &sock);
+	pthread_join(childs[0], NULL);
+	pthread_join(childs[1], NULL);
+    close(sock);
+    
+    return NULL;
 }
 
