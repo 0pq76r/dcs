@@ -1,15 +1,7 @@
 #include "tracker.h"
 
-#define BUFFER_SIZE 1024
 
 pthread_mutex_t lock_accept;
-
-struct sender_data
-{
-	int socket;
-	char data[BUFFER_SIZE];
-	int data_lenght;
-};
 
 void *child_tracker_tx(void *send)
 {
@@ -39,7 +31,6 @@ void *child_tracker_tx(void *send)
 void *child_tracker_rx(void *_sock)
 {
     int sock;
-    pthread_t sender;
 	char buffer[BUFFER_SIZE];
 	struct sender_data *send;
     
@@ -66,10 +57,11 @@ void *child_tracker_rx(void *_sock)
 			send->socket=sock;
 			strncpy(send->data, buffer, BUFFER_SIZE-1);
 			send->data_lenght=data_lenght;
-			pthread_create( &sender, NULL, child_tracker_tx, send);
+			child_tracker_tx(send);
 			bzero(buffer, BUFFER_SIZE);
 		}
-		pthread_join(sender, NULL);
+
+
 		pthread_mutex_lock(&recv_list_lock);
 		while(1)
 		{

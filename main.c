@@ -1,7 +1,27 @@
 #include "main.h"
 
+void *input()
+{
+	int data_lenght;
+	char buffer[BUFFER_SIZE];
+	struct sender_data *send;
+	
+	while(1)
+	{
+		data_lenght=read(0, buffer, BUFFER_SIZE-2);
+		send=malloc(sizeof(struct sender_data));
+		send->socket=-1;
+		strncpy(send->data, buffer, BUFFER_SIZE-1);
+		send->data_lenght=data_lenght;
+		child_tracker_tx(send);
+		bzero(buffer, BUFFER_SIZE);
+	}
+	return NULL;
+}
+
 int main(int argc, char **argv){
 	pthread_t tracker_thread;
+	pthread_t input_thread;
 	int local_port;
 	int remote_port;
 	char remote_ip[1024];
@@ -21,12 +41,15 @@ int main(int argc, char **argv){
 	void *tmp=&local_port;
 	pthread_create( &tracker_thread, NULL, tracker, tmp);
 	
-	//connect to parent tracker
-
 	//read and write messages to peers
+	pthread_create( &input_thread, NULL, input, NULL);
+
+	//connect to parent tracker
+	client(remote_ip, remote_port);
 
 	//redirect peers to other tracker and quit
 	pthread_join(tracker_thread, NULL);
+	pthread_join(input_thread, NULL);
 	
 	return 0;
 }

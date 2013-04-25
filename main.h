@@ -6,6 +6,7 @@
 #include <getopt.h>
 #include <pthread.h>
 
+#include "client.h"
 #include "tracker.h"
 #include "fifo.h"
 
