@@ -7,6 +7,10 @@
 #include <pthread.h>
 
 #include "tracker.h"
+#include "fifo.h"
+
+struct _fifo *recv_list;
+pthread_mutex_t recv_list_lock;
 
 #endif
 
